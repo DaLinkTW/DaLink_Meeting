@@ -25,7 +25,6 @@
         const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyt7Lfy8xj-9-0kI0y2P-mDfhC7pa74KeQ4cmyw9Hy48IdV495eaGNwvlwP7xEUFXyUwA/exec"; 
         const ADMIN_PASSWORD = "admin0408"; 
 
-        // 生成 00 或 30 分鐘的時間選項
         const generateTimeOptions = () => {
             const options = [];
             for (let hour = 8; hour <= 20; hour++) {
@@ -37,7 +36,6 @@
         };
         const TIME_OPTIONS = generateTimeOptions();
 
-        // 強健的日期格式化
         const formatDate = (input) => {
             if (!input) return "";
             try {
@@ -68,9 +66,7 @@
                     const m = parts[1].trim().slice(0, 2).padStart(2, '0');
                     return `${h}:${m}`;
                 }
-            } catch (e) {
-                console.error("Time parse error:", e);
-            }
+            } catch (e) { console.error(e); }
             return str;
         };
 
@@ -88,33 +84,27 @@
                 return (
                     <img 
                         src="https://lh3.google.com/u/0/d/1qc-oaNh8kQVx2FrBkUtnd0NTda6ScIDT=w1920-h953-iv2?auditContext=prefetch" 
-                        alt="custom icon" 
+                        alt="logo" 
                         style={{ width: '4em', height: '4em' }}
                         className={`object-contain inline-block align-bottom ${className}`}
                         onError={(e) => { e.target.src = 'https://via.placeholder.com/40?text=IMG'; }}
                     />
                 );
             }
-
             const icons = {
                 calendar: <React.Fragment><rect x="3" y="4" width="18" height="18" rx="2" ry="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></React.Fragment>,
                 cloud: <path d="M17.5 19c3.037 0 5.5-2.463 5.5-5.5 0-2.97-2.354-5.402-5.304-5.494A7 7 0 1 0 5 13.045c0 .015 0 .03.001.045C2.181 13.528 0 15.937 0 18.889c0 3.037 2.463 5.5 5.5 5.5h12z" />,
-                plus: <path d="M12 5v14M5 12h14" />,
                 "map-pin": <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0zM12 10a3 3 0 1 0 0-6 3 3 0 0 0 0 6z" />,
                 clock: <React.Fragment><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></React.Fragment>,
                 user: <React.Fragment><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></React.Fragment>,
-                list: <React.Fragment><line x1="8" y1="6" x2="21" y2="6" /><line x1="8" y1="12" x2="21" y2="12" /><line x1="8" y1="18" x2="21" y2="18" /><line x1="3" y1="6" x2="3.01" y2="6" /><line x1="3" y1="12" x2="3.01" y2="12" /><line x1="3" y1="18" x2="3.01" y2="18" /></React.Fragment>,
                 "chevron-left": <polyline points="15 18 9 12 15 6" />,
                 "chevron-right": <polyline points="9 18 15 12 9 6" />,
                 x: <React.Fragment><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></React.Fragment>,
                 "loader-2": <path d="M21 12a9 9 0 1 1-6.219-8.56" />,
-                "alert-circle": <React.Fragment><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></React.Fragment>,
-                "check-circle-2": <React.Fragment><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z" /><path d="m9 12 2 2 4-4" /></React.Fragment>,
                 lock: <React.Fragment><rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></React.Fragment>,
                 unlock: <React.Fragment><rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 9.9-1" /></React.Fragment>,
                 edit: <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
             };
-
             return (
                 <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`${className} ${name === 'loader-2' ? 'animate-spin' : ''}`}>
                     {icons[name] || null}
@@ -130,6 +120,9 @@
             const [isSyncing, setIsSyncing] = useState(false);
             const [notification, setNotification] = useState(null);
             const [isAdmin, setIsAdmin] = useState(false);
+            
+            // 編輯模態視窗狀態
+            const [editingBooking, setEditingBooking] = useState(null);
 
             const [formData, setFormData] = useState({
                 roomId: 'room-a',
@@ -195,11 +188,11 @@
                 }
             };
 
-            // 1. 時間衝突檢查邏輯
-            const checkConflict = (newBooking) => {
+            const checkConflict = (newBooking, excludeId = null) => {
                 const start = newBooking.startTime;
                 const end = newBooking.endTime;
                 const conflicts = bookings.filter(b => 
+                    b.id !== excludeId &&
                     b.date === newBooking.date && 
                     b.roomId === newBooking.roomId &&
                     start < b.endTime && end > b.startTime
@@ -209,19 +202,12 @@
 
             const handleSubmit = async (e) => {
                 e.preventDefault();
-                
-                // 3. 防呆機制：去除前後空白，避免僅輸入空白鍵
                 const trimmedTitle = formData.title.trim();
                 const trimmedUser = formData.user.trim();
-
-                if (!trimmedTitle || !trimmedUser) return showNotification("請填寫主題與預約者（不可僅輸入空白）", "error");
-                
-                // 2. 結束時間驗證：最終送出前再次確認
+                if (!trimmedTitle || !trimmedUser) return showNotification("請填寫主題與預約者", "error");
                 if (formData.startTime >= formData.endTime) return showNotification("結束時間必須大於開始時間", "error");
-
-                // 1. 時間衝突檢查：送出前比對現有資料
                 const conflict = checkConflict(formData);
-                if (conflict) return showNotification(`時段衝突！該會議室已有人預約：\n[${conflict.startTime}-${conflict.endTime}] ${conflict.title}`, "error");
+                if (conflict) return showNotification(`時段衝突：[${conflict.startTime}-${conflict.endTime}] ${conflict.title}`, "error");
 
                 setIsLoading(true);
                 try {
@@ -241,6 +227,40 @@
                 }
             };
 
+            // 管理員修改儲存功能
+            const handleUpdate = async () => {
+                if (!editingBooking) return;
+                const trimmedTitle = editingBooking.title.trim();
+                const trimmedUser = editingBooking.user.trim();
+                if (!trimmedTitle || !trimmedUser) return showNotification("欄位不可為空", "error");
+                if (editingBooking.startTime >= editingBooking.endTime) return showNotification("結束時間必須大於開始時間", "error");
+                
+                const conflict = checkConflict(editingBooking, editingBooking.id);
+                if (conflict) return showNotification(`修改衝突：[${conflict.startTime}-${conflict.endTime}] ${conflict.title}`, "error");
+
+                setIsLoading(true);
+                try {
+                    // 同樣使用 add action (或在 Apps Script 修改 update 邏輯，這裡假設後端 add 支援覆蓋 id)
+                    // 如果 Apps Script 未特別寫 update，通常是先刪除舊的再加新的
+                    await fetch(SCRIPT_URL, { 
+                        method: 'POST', 
+                        body: JSON.stringify({ action: 'delete', id: String(editingBooking.id) }) 
+                    });
+                    await fetch(SCRIPT_URL, { 
+                        method: 'POST', 
+                        body: JSON.stringify({ action: 'add', data: editingBooking }) 
+                    });
+                    
+                    showNotification('資料已修改');
+                    setEditingBooking(null);
+                    fetchBookings();
+                } catch (error) {
+                    showNotification('更新失敗', 'error');
+                } finally {
+                    setIsLoading(false);
+                }
+            };
+
             const handleDelete = async (id) => {
                 if (!isAdmin) return;
                 if (!confirm("確定要刪除嗎？")) return;
@@ -248,6 +268,7 @@
                 try {
                     await fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'delete', id: String(id) }) });
                     fetchBookings();
+                    showNotification('已刪除');
                 } catch (error) {
                     showNotification('刪除失敗', 'error');
                     setIsSyncing(false);
@@ -265,33 +286,22 @@
                 const daysInMonth = new Date(year, month + 1, 0).getDate();
                 const firstDay = new Date(year, month, 1).getDay();
                 const days = [];
-                
                 for (let i = 0; i < firstDay; i++) days.push(<div key={`empty-${i}`} className="p-2 bg-gray-50/50"></div>);
-                
                 for (let d = 1; d <= daysInMonth; d++) {
                     const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-                    // 取得該日的所有預約，並按時間排序
                     const dayBookings = bookings.filter(b => b.date === dateStr).sort((a, b) => a.startTime.localeCompare(b.startTime));
-                    
                     days.push(
                         <div key={dateStr} onClick={() => { setSelectedDate(dateStr); setViewMode('daily'); }} className={`min-h-[110px] p-1 border border-gray-100 cursor-pointer hover:bg-blue-50 flex flex-col ${dateStr === selectedDate ? 'bg-blue-50 ring-1 ring-blue-500 inset' : 'bg-white'}`}>
                             <div className={`text-xs font-bold text-center w-full pb-1 mb-1 border-b ${dateStr === formatDate(new Date()) ? 'text-blue-600' : 'text-gray-500'}`}>
                                 {d}
                             </div>
-                            
-                            {/* 詳細預約清單展示區塊 */}
                             <div className="flex-1 overflow-y-auto space-y-1 no-scrollbar w-full">
                                 {dayBookings.map(b => {
                                     const room = ROOMS.find(r => r.id === b.roomId);
-                                    // 擷取會議室簡稱，例如把 "會議室 901 (中型 10-15人)" 變成 "901"
                                     const shortName = room ? room.name.replace(/會議室\s*/, '').split(' ')[0] : '';
                                     return (
-                                        <div 
-                                            key={b.id} 
-                                            className={`text-[10px] leading-tight px-1 py-0.5 rounded truncate border ${room ? room.color : 'bg-gray-100 text-gray-700'}`} 
-                                            title={`會議室：${room?.name}\n時段：${b.startTime}-${b.endTime}\n主題：${b.title}\n預約者：${b.user}`}
-                                        >
-                                            <span className="font-bold">{shortName}</span> {b.startTime}-{b.endTime}
+                                        <div key={b.id} className={`text-[10px] leading-tight px-1 py-0.5 rounded truncate border ${room ? room.color : 'bg-gray-100'}`}>
+                                            <span className="font-bold">{shortName}</span> {b.startTime}
                                         </div>
                                     );
                                 })}
@@ -311,18 +321,14 @@
                 <div className="min-h-screen p-4 md:p-8 flex flex-col">
                     <div className="max-w-6xl mx-auto w-full flex-grow">
                         
-                        <header className="mb-8">
+                        <header className="mb-6">
                             <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
                                 <div className="flex flex-col items-start">
                                     <div className="flex items-center gap-3">
                                         <Icon name="calendar" isCustom={true} className="flex-shrink-0" />
-                                        <h1 className="text-xl md:text-3xl font-bold text-gray-900 leading-none">
-                                            大林聯合建築師事務所
-                                        </h1>
+                                        <h1 className="text-xl md:text-3xl font-bold text-gray-900 leading-none">大林聯合建築師事務所</h1>
                                     </div>
-                                    <h2 className="text-gray-600 text-lg md:text-2xl font-bold mt-2">
-                                        會議室預約管理系統 V1.1
-                                    </h2>
+                                    <h2 className="text-gray-600 text-lg md:text-2xl font-bold mt-0.5">會議室預約管理系統 V1.2</h2>
                                     <div className="flex items-center gap-4 mt-3">
                                         <div className="flex items-center gap-2 text-gray-400 text-xs">
                                             <Icon name="cloud" size={14} />
@@ -353,68 +359,38 @@
                         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                             <div className="lg:col-span-1">
                                 <div className="bg-white rounded-xl shadow-sm border p-6 sticky top-6">
+                                    <h3 className="text-sm font-bold text-gray-800 mb-4 border-b pb-2">預約登記表</h3>
                                     <form onSubmit={handleSubmit} className="space-y-4">
                                         <div>
-                                            <label className="block text-xs font-bold text-gray-400 mb-1 uppercase tracking-wider flex items-center gap-1">
-                                                <Icon name="map-pin" size={14} /> 會議室
-                                            </label>
+                                            <label className="block text-xs font-bold text-gray-400 mb-1 uppercase tracking-wider flex items-center gap-1"><Icon name="map-pin" size={14} /> 會議室</label>
                                             <select value={formData.roomId} onChange={e => setFormData({...formData, roomId: e.target.value})} className="w-full rounded border-gray-200 border p-2 bg-gray-50 text-sm outline-none focus:border-blue-500">
                                                 {ROOMS.map(room => <option key={room.id} value={room.id}>{room.name}</option>)}
                                             </select>
                                         </div>
                                         <div>
-                                            <label className="block text-xs font-bold text-gray-400 mb-1 uppercase tracking-wider flex items-center gap-1">
-                                                <Icon name="calendar" size={14} /> 日期
-                                            </label>
+                                            <label className="block text-xs font-bold text-gray-400 mb-1 uppercase tracking-wider flex items-center gap-1"><Icon name="calendar" size={14} /> 日期</label>
                                             <input type="date" value={formData.date} onChange={e => {setFormData({...formData, date: e.target.value}); setSelectedDate(e.target.value);}} className="w-full rounded border-gray-200 border p-2 bg-gray-50 text-sm outline-none focus:border-blue-500" />
                                         </div>
                                         <div className="grid grid-cols-2 gap-4">
                                             <div>
-                                                <label className="block text-xs font-bold text-gray-400 mb-1 flex items-center gap-1">
-                                                    <Icon name="clock" size={14} /> 開始
-                                                </label>
-                                                <select value={formData.startTime} onChange={e => {
-                                                    const newStartTime = e.target.value;
-                                                    let newEndTime = formData.endTime;
-                                                    // 2. 動態防呆：若選擇的開始時間大於等於結束時間，自動將結束時間順延
-                                                    if (newStartTime >= newEndTime) {
-                                                        const nextIndex = TIME_OPTIONS.indexOf(newStartTime) + 1;
-                                                        if (nextIndex < TIME_OPTIONS.length) {
-                                                            newEndTime = TIME_OPTIONS[nextIndex];
-                                                        }
-                                                    }
-                                                    setFormData({...formData, startTime: newStartTime, endTime: newEndTime});
-                                                }} className="w-full rounded border-gray-200 border p-2 bg-gray-50 text-sm outline-none focus:border-blue-500">
+                                                <label className="block text-xs font-bold text-gray-400 mb-1 flex items-center gap-1"><Icon name="clock" size={14} /> 開始</label>
+                                                <select value={formData.startTime} onChange={e => setFormData({...formData, startTime: e.target.value})} className="w-full rounded border-gray-200 border p-2 bg-gray-50 text-sm outline-none focus:border-blue-500">
                                                     {TIME_OPTIONS.map(time => <option key={time} value={time}>{time}</option>)}
                                                 </select>
                                             </div>
                                             <div>
-                                                <label className="block text-xs font-bold text-gray-400 mb-1 flex items-center gap-1">
-                                                    <Icon name="clock" size={14} /> 結束
-                                                </label>
-                                                <select value={formData.endTime} onChange={e => {
-                                                    const newEndTime = e.target.value;
-                                                    // 2. 動態防呆：手動選擇結束時間小於開始時間時阻擋
-                                                    if (newEndTime <= formData.startTime) {
-                                                        showNotification("結束時間必須大於開始時間", "error");
-                                                        return;
-                                                    }
-                                                    setFormData({...formData, endTime: newEndTime});
-                                                }} className="w-full rounded border-gray-200 border p-2 bg-gray-50 text-sm outline-none focus:border-blue-500">
+                                                <label className="block text-xs font-bold text-gray-400 mb-1 flex items-center gap-1"><Icon name="clock" size={14} /> 結束</label>
+                                                <select value={formData.endTime} onChange={e => setFormData({...formData, endTime: e.target.value})} className="w-full rounded border-gray-200 border p-2 bg-gray-50 text-sm outline-none focus:border-blue-500">
                                                     {TIME_OPTIONS.map(time => <option key={time} value={time}>{time}</option>)}
                                                 </select>
                                             </div>
                                         </div>
                                         <div>
-                                            <label className="block text-xs font-bold text-gray-400 mb-1 flex items-center gap-1">
-                                                <Icon name="edit" size={14} /> 會議主題
-                                            </label>
+                                            <label className="block text-xs font-bold text-gray-400 mb-1 flex items-center gap-1"><Icon name="edit" size={14} /> 會議主題</label>
                                             <input type="text" value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} className="w-full rounded border-gray-200 border p-2 bg-gray-50 text-sm outline-none focus:border-blue-500" placeholder="請輸入會議主題" />
                                         </div>
                                         <div>
-                                            <label className="block text-xs font-bold text-gray-400 mb-1 flex items-center gap-1">
-                                                <Icon name="user" size={14} /> 預約者
-                                            </label>
+                                            <label className="block text-xs font-bold text-gray-400 mb-1 flex items-center gap-1"><Icon name="user" size={14} /> 預約者</label>
                                             <input type="text" value={formData.user} onChange={e => setFormData({...formData, user: e.target.value})} className="w-full rounded border-gray-200 border p-2 bg-gray-50 text-sm outline-none focus:border-blue-500" placeholder="您的姓名+分機" />
                                         </div>
                                         <button type="submit" disabled={isLoading} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded transition flex items-center justify-center gap-2">
@@ -451,7 +427,12 @@
                                                                                 <span className="text-xs font-mono font-bold text-blue-600 bg-white px-2 py-1 rounded border">{b.startTime}-{b.endTime}</span>
                                                                                 <span className="text-sm font-bold text-gray-700">{b.title} <span className="text-gray-400 font-normal ml-2">({b.user})</span></span>
                                                                             </div>
-                                                                            {isAdmin && <button onClick={() => handleDelete(b.id)} className="text-gray-300 hover:text-red-500"><Icon name="x" size={14} /></button>}
+                                                                            {isAdmin && (
+                                                                                <div className="flex items-center gap-2">
+                                                                                    <button onClick={() => setEditingBooking(b)} className="text-gray-300 hover:text-blue-500 p-1 transition"><Icon name="edit" size={14} /></button>
+                                                                                    <button onClick={() => handleDelete(b.id)} className="text-gray-300 hover:text-red-500 p-1 transition"><Icon name="x" size={14} /></button>
+                                                                                </div>
+                                                                            )}
                                                                         </div>
                                                                     ))}
                                                                 </div>
@@ -466,16 +447,67 @@
                             </div>
                         </div>
 
-                        {/* 頁底備註資訊：靠右對齊的 3 行灰色小字 */}
                         <footer className="mt-12 pt-4 border-t border-gray-200 text-right text-xs text-gray-400 space-y-1 pb-4">
                             <p>系統開發者：吳書緯、許卓嘉</p>
                             <p>9F管理者：張芸眉、李協華、鄭兆捷、廖詩華</p>
                             <p>7F管理者：陳惠琴、巫郁瑩、吳書緯</p>
                         </footer>
-
                     </div>
+
+                    {/* 管理員編輯彈窗 */}
+                    {editingBooking && (
+                        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
+                            <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200">
+                                <div className="bg-blue-600 p-4 text-white flex justify-between items-center font-bold">
+                                    <span>修改預約資料</span>
+                                    <button onClick={() => setEditingBooking(null)}><Icon name="x" /></button>
+                                </div>
+                                <div className="p-6 space-y-4">
+                                    <div>
+                                        <label className="block text-xs font-bold text-gray-400 mb-1">會議室</label>
+                                        <select value={editingBooking.roomId} onChange={e => setEditingBooking({...editingBooking, roomId: e.target.value})} className="w-full border rounded p-2 text-sm bg-gray-50 focus:border-blue-500 outline-none">
+                                            {ROOMS.map(room => <option key={room.id} value={room.id}>{room.name}</option>)}
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-gray-400 mb-1">會議日期</label>
+                                        <input type="date" value={editingBooking.date} onChange={e => setEditingBooking({...editingBooking, date: e.target.value})} className="w-full border rounded p-2 text-sm bg-gray-50 focus:border-blue-500 outline-none" />
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-xs font-bold text-gray-400 mb-1">開始時間</label>
+                                            <select value={editingBooking.startTime} onChange={e => setEditingBooking({...editingBooking, startTime: e.target.value})} className="w-full border rounded p-2 text-sm bg-gray-50 focus:border-blue-500 outline-none">
+                                                {TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-bold text-gray-400 mb-1">結束時間</label>
+                                            <select value={editingBooking.endTime} onChange={e => setEditingBooking({...editingBooking, endTime: e.target.value})} className="w-full border rounded p-2 text-sm bg-gray-50 focus:border-blue-500 outline-none">
+                                                {TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-gray-400 mb-1">會議主題</label>
+                                        <input type="text" value={editingBooking.title} onChange={e => setEditingBooking({...editingBooking, title: e.target.value})} className="w-full border rounded p-2 text-sm bg-gray-50 focus:border-blue-500 outline-none" />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-gray-400 mb-1">預約者</label>
+                                        <input type="text" value={editingBooking.user} onChange={e => setEditingBooking({...editingBooking, user: e.target.value})} className="w-full border rounded p-2 text-sm bg-gray-50 focus:border-blue-500 outline-none" />
+                                    </div>
+                                    <div className="flex gap-3 pt-4 border-t">
+                                        <button onClick={() => setEditingBooking(null)} className="flex-1 py-2 text-gray-500 font-bold hover:bg-gray-100 rounded">取消</button>
+                                        <button onClick={handleUpdate} disabled={isLoading} className="flex-1 py-2 bg-blue-600 text-white font-bold hover:bg-blue-700 rounded flex items-center justify-center gap-2">
+                                            {isLoading ? <Icon name="loader-2" size={16} /> : '儲存修改'}
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
                     {notification && (
-                        <div className={`fixed bottom-4 right-4 px-6 py-3 rounded-lg shadow-lg text-white font-bold transition-all z-50 ${notification.type === 'error' ? 'bg-red-500' : 'bg-green-500'}`}>
+                        <div className={`fixed bottom-4 right-4 px-6 py-3 rounded-lg shadow-lg text-white font-bold transition-all z-[110] animate-in slide-in-from-bottom-5 ${notification.type === 'error' ? 'bg-red-500' : 'bg-green-500'}`}>
                             {notification.message}
                         </div>
                     )}
