@@ -120,8 +120,6 @@
             const [isSyncing, setIsSyncing] = useState(false);
             const [notification, setNotification] = useState(null);
             const [isAdmin, setIsAdmin] = useState(false);
-            
-            // 編輯模態視窗狀態
             const [editingBooking, setEditingBooking] = useState(null);
 
             const [formData, setFormData] = useState({
@@ -176,12 +174,12 @@
             const toggleAdmin = () => {
                 if (isAdmin) {
                     setIsAdmin(false);
-                    showNotification("已登出管理員模式");
+                    showNotification("已登出管理者模式");
                 } else {
-                    const pwd = prompt("請輸入管理員密碼：");
+                    const pwd = prompt("請輸入管理者密碼：");
                     if (pwd === ADMIN_PASSWORD) {
                         setIsAdmin(true);
-                        showNotification("已進入管理員模式");
+                        showNotification("已進入管理者模式");
                     } else if (pwd !== null) {
                         showNotification("密碼錯誤", "error");
                     }
@@ -227,7 +225,6 @@
                 }
             };
 
-            // 管理員修改儲存功能
             const handleUpdate = async () => {
                 if (!editingBooking) return;
                 const trimmedTitle = editingBooking.title.trim();
@@ -240,8 +237,6 @@
 
                 setIsLoading(true);
                 try {
-                    // 同樣使用 add action (或在 Apps Script 修改 update 邏輯，這裡假設後端 add 支援覆蓋 id)
-                    // 如果 Apps Script 未特別寫 update，通常是先刪除舊的再加新的
                     await fetch(SCRIPT_URL, { 
                         method: 'POST', 
                         body: JSON.stringify({ action: 'delete', id: String(editingBooking.id) }) 
@@ -336,7 +331,7 @@
                                         </div>
                                         <button onClick={toggleAdmin} className={`text-xs font-medium ${isAdmin ? 'text-green-600' : 'text-gray-400'}`}>
                                             <Icon name={isAdmin ? "unlock" : "lock"} size={12} className="inline mr-1" />
-                                            {isAdmin ? "管理員模式" : "管理員登入"}
+                                            {isAdmin ? "管理者模式" : "管理者登入"}
                                         </button>
                                     </div>
                                 </div>
@@ -442,19 +437,24 @@
                                                 })}
                                             </div>
                                         ) : renderMonthCalendar()}
+
+                                        {/* 新增的紅色提示字樣 */}
+                                        <div className="mt-6 pt-4 border-t border-gray-100">
+                                            <p className="text-[11px] text-red-500 font-medium">※ 如需修改或刪除預約資料，請聯絡管理者</p>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
                         </div>
 
                         <footer className="mt-12 pt-4 border-t border-gray-200 text-right text-xs text-gray-400 space-y-1 pb-4">
-                            <p>系統開發者：吳書緯、許卓嘉</p>
-                            <p>9F管理者：張芸眉、李協華、鄭兆捷、廖詩華</p>
-                            <p>7F管理者：陳惠琴、巫郁瑩、吳書緯</p>
+                            <p>系統開發者：吳書緯 分機731、許卓嘉 分機734</p>
+                            <p>9F管理者：張芸眉 分機502、李協華 分機501、鄭兆捷 分機243、廖詩華 分機241</p>
+                            <p>7F管理者：陳惠琴 分機721、巫郁瑩 分機722、吳書緯 分機731</p>
                         </footer>
                     </div>
 
-                    {/* 管理員編輯彈窗 */}
+                    {/* 管理者編輯彈窗 */}
                     {editingBooking && (
                         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
                             <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200">
