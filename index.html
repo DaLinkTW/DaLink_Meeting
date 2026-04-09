@@ -23,7 +23,7 @@
 
         // === 設定區 ===
         const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyt7Lfy8xj-9-0kI0y2P-mDfhC7pa74KeQ4cmyw9Hy48IdV495eaGNwvlwP7xEUFXyUwA/exec"; 
-        const ADMIN_PASSWORD = "admin0408"; // 管理員預設密碼
+        const ADMIN_PASSWORD = "admin0408"; 
 
         // 生成 00 或 30 分鐘的時間選項
         const generateTimeOptions = () => {
@@ -37,7 +37,7 @@
         };
         const TIME_OPTIONS = generateTimeOptions();
 
-        // 強健的日期格式化 (只取 YYYY-MM-DD)
+        // 強健的日期格式化
         const formatDate = (input) => {
             if (!input) return "";
             try {
@@ -89,7 +89,7 @@
                     <img 
                         src="https://lh3.google.com/u/0/d/1qc-oaNh8kQVx2FrBkUtnd0NTda6ScIDT=w1920-h953-iv2?auditContext=prefetch" 
                         alt="custom icon" 
-                        style={{ width: '3em', height: '3em' }}
+                        style={{ width: '4em', height: '4em' }}
                         className={`object-contain inline-block align-bottom ${className}`}
                         onError={(e) => { e.target.src = 'https://via.placeholder.com/40?text=IMG'; }}
                     />
@@ -195,17 +195,39 @@
                 }
             };
 
+            // 1. 時間衝突檢查邏輯
+            const checkConflict = (newBooking) => {
+                const start = newBooking.startTime;
+                const end = newBooking.endTime;
+                const conflicts = bookings.filter(b => 
+                    b.date === newBooking.date && 
+                    b.roomId === newBooking.roomId &&
+                    start < b.endTime && end > b.startTime
+                );
+                return conflicts.length > 0 ? conflicts[0] : null;
+            };
+
             const handleSubmit = async (e) => {
                 e.preventDefault();
-                if (!formData.title || !formData.user) {
-                    showNotification('請填寫完整資訊', 'error');
-                    return;
-                }
+                
+                // 3. 防呆機制：去除前後空白，避免僅輸入空白鍵
+                const trimmedTitle = formData.title.trim();
+                const trimmedUser = formData.user.trim();
+
+                if (!trimmedTitle || !trimmedUser) return showNotification("請填寫主題與預約者（不可僅輸入空白）", "error");
+                
+                // 2. 結束時間驗證：最終送出前再次確認
+                if (formData.startTime >= formData.endTime) return showNotification("結束時間必須大於開始時間", "error");
+
+                // 1. 時間衝突檢查：送出前比對現有資料
+                const conflict = checkConflict(formData);
+                if (conflict) return showNotification(`時段衝突！該會議室已有人預約：\n[${conflict.startTime}-${conflict.endTime}] ${conflict.title}`, "error");
+
                 setIsLoading(true);
                 try {
                     const response = await fetch(SCRIPT_URL, {
                         method: 'POST',
-                        body: JSON.stringify({ action: 'add', data: { ...formData, id: Date.now().toString() } })
+                        body: JSON.stringify({ action: 'add', data: { ...formData, title: trimmedTitle, user: trimmedUser, id: Date.now().toString() } })
                     });
                     if (response.ok) {
                         showNotification('預約成功！');
@@ -243,14 +265,37 @@
                 const daysInMonth = new Date(year, month + 1, 0).getDate();
                 const firstDay = new Date(year, month, 1).getDay();
                 const days = [];
+                
                 for (let i = 0; i < firstDay; i++) days.push(<div key={`empty-${i}`} className="p-2 bg-gray-50/50"></div>);
+                
                 for (let d = 1; d <= daysInMonth; d++) {
                     const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-                    const hasBookings = bookings.some(b => b.date === dateStr);
+                    // 取得該日的所有預約，並按時間排序
+                    const dayBookings = bookings.filter(b => b.date === dateStr).sort((a, b) => a.startTime.localeCompare(b.startTime));
+                    
                     days.push(
-                        <div key={dateStr} onClick={() => { setSelectedDate(dateStr); setViewMode('daily'); }} className={`min-h-[80px] p-1 border border-gray-100 cursor-pointer hover:bg-blue-50 ${dateStr === selectedDate ? 'bg-blue-50 ring-1 ring-blue-500 inset' : 'bg-white'}`}>
-                            <div className="text-xs font-bold text-gray-500">{d}</div>
-                            {hasBookings && <div className="mt-1 w-2 h-2 bg-blue-500 rounded-full mx-auto"></div>}
+                        <div key={dateStr} onClick={() => { setSelectedDate(dateStr); setViewMode('daily'); }} className={`min-h-[110px] p-1 border border-gray-100 cursor-pointer hover:bg-blue-50 flex flex-col ${dateStr === selectedDate ? 'bg-blue-50 ring-1 ring-blue-500 inset' : 'bg-white'}`}>
+                            <div className={`text-xs font-bold text-center w-full pb-1 mb-1 border-b ${dateStr === formatDate(new Date()) ? 'text-blue-600' : 'text-gray-500'}`}>
+                                {d}
+                            </div>
+                            
+                            {/* 詳細預約清單展示區塊 */}
+                            <div className="flex-1 overflow-y-auto space-y-1 no-scrollbar w-full">
+                                {dayBookings.map(b => {
+                                    const room = ROOMS.find(r => r.id === b.roomId);
+                                    // 擷取會議室簡稱，例如把 "會議室 901 (中型 10-15人)" 變成 "901"
+                                    const shortName = room ? room.name.replace(/會議室\s*/, '').split(' ')[0] : '';
+                                    return (
+                                        <div 
+                                            key={b.id} 
+                                            className={`text-[10px] leading-tight px-1 py-0.5 rounded truncate border ${room ? room.color : 'bg-gray-100 text-gray-700'}`} 
+                                            title={`會議室：${room?.name}\n時段：${b.startTime}-${b.endTime}\n主題：${b.title}\n預約者：${b.user}`}
+                                        >
+                                            <span className="font-bold">{shortName}</span> {b.startTime}-{b.endTime}
+                                        </div>
+                                    );
+                                })}
+                            </div>
                         </div>
                     );
                 }
@@ -263,16 +308,21 @@
             };
 
             return (
-                <div className="min-h-screen p-4 md:p-8">
-                    <div className="max-w-6xl mx-auto">
+                <div className="min-h-screen p-4 md:p-8 flex flex-col">
+                    <div className="max-w-6xl mx-auto w-full flex-grow">
+                        
                         <header className="mb-8">
                             <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
                                 <div className="flex flex-col items-start">
                                     <div className="flex items-center gap-3">
                                         <Icon name="calendar" isCustom={true} className="flex-shrink-0" />
-                                        <h1 className="text-xl md:text-3xl font-bold text-gray-900 leading-none">大林聯合建築師事務所</h1>
+                                        <h1 className="text-xl md:text-3xl font-bold text-gray-900 leading-none">
+                                            大林聯合建築師事務所
+                                        </h1>
                                     </div>
-                                    <h2 className="text-gray-600 text-lg md:text-2xl font-bold mt-2">會議室預約管理系統 V1.0</h2>
+                                    <h2 className="text-gray-600 text-lg md:text-2xl font-bold mt-2">
+                                        會議室預約管理系統 V1.1
+                                    </h2>
                                     <div className="flex items-center gap-4 mt-3">
                                         <div className="flex items-center gap-2 text-gray-400 text-xs">
                                             <Icon name="cloud" size={14} />
@@ -323,7 +373,18 @@
                                                 <label className="block text-xs font-bold text-gray-400 mb-1 flex items-center gap-1">
                                                     <Icon name="clock" size={14} /> 開始
                                                 </label>
-                                                <select value={formData.startTime} onChange={e => setFormData({...formData, startTime: e.target.value})} className="w-full rounded border-gray-200 border p-2 bg-gray-50 text-sm outline-none focus:border-blue-500">
+                                                <select value={formData.startTime} onChange={e => {
+                                                    const newStartTime = e.target.value;
+                                                    let newEndTime = formData.endTime;
+                                                    // 2. 動態防呆：若選擇的開始時間大於等於結束時間，自動將結束時間順延
+                                                    if (newStartTime >= newEndTime) {
+                                                        const nextIndex = TIME_OPTIONS.indexOf(newStartTime) + 1;
+                                                        if (nextIndex < TIME_OPTIONS.length) {
+                                                            newEndTime = TIME_OPTIONS[nextIndex];
+                                                        }
+                                                    }
+                                                    setFormData({...formData, startTime: newStartTime, endTime: newEndTime});
+                                                }} className="w-full rounded border-gray-200 border p-2 bg-gray-50 text-sm outline-none focus:border-blue-500">
                                                     {TIME_OPTIONS.map(time => <option key={time} value={time}>{time}</option>)}
                                                 </select>
                                             </div>
@@ -331,7 +392,15 @@
                                                 <label className="block text-xs font-bold text-gray-400 mb-1 flex items-center gap-1">
                                                     <Icon name="clock" size={14} /> 結束
                                                 </label>
-                                                <select value={formData.endTime} onChange={e => setFormData({...formData, endTime: e.target.value})} className="w-full rounded border-gray-200 border p-2 bg-gray-50 text-sm outline-none focus:border-blue-500">
+                                                <select value={formData.endTime} onChange={e => {
+                                                    const newEndTime = e.target.value;
+                                                    // 2. 動態防呆：手動選擇結束時間小於開始時間時阻擋
+                                                    if (newEndTime <= formData.startTime) {
+                                                        showNotification("結束時間必須大於開始時間", "error");
+                                                        return;
+                                                    }
+                                                    setFormData({...formData, endTime: newEndTime});
+                                                }} className="w-full rounded border-gray-200 border p-2 bg-gray-50 text-sm outline-none focus:border-blue-500">
                                                     {TIME_OPTIONS.map(time => <option key={time} value={time}>{time}</option>)}
                                                 </select>
                                             </div>
@@ -346,7 +415,7 @@
                                             <label className="block text-xs font-bold text-gray-400 mb-1 flex items-center gap-1">
                                                 <Icon name="user" size={14} /> 預約者
                                             </label>
-                                            <input type="text" value={formData.user} onChange={e => setFormData({...formData, user: e.target.value})} className="w-full rounded border-gray-200 border p-2 bg-gray-50 text-sm outline-none focus:border-blue-500" placeholder="您的姓名 +（分機）" />
+                                            <input type="text" value={formData.user} onChange={e => setFormData({...formData, user: e.target.value})} className="w-full rounded border-gray-200 border p-2 bg-gray-50 text-sm outline-none focus:border-blue-500" placeholder="您的姓名+分機" />
                                         </div>
                                         <button type="submit" disabled={isLoading} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded transition flex items-center justify-center gap-2">
                                             {isLoading ? <Icon name="loader-2" size={18} /> : '登記'}
@@ -396,6 +465,14 @@
                                 </div>
                             </div>
                         </div>
+
+                        {/* 頁底備註資訊：靠右對齊的 3 行灰色小字 */}
+                        <footer className="mt-12 pt-4 border-t border-gray-200 text-right text-xs text-gray-400 space-y-1 pb-4">
+                            <p>系統開發者：吳書緯、許卓嘉</p>
+                            <p>9F管理者：張芸眉、李協華、鄭兆捷、廖詩華</p>
+                            <p>7F管理者：陳惠琴、巫郁瑩、吳書緯</p>
+                        </footer>
+
                     </div>
                     {notification && (
                         <div className={`fixed bottom-4 right-4 px-6 py-3 rounded-lg shadow-lg text-white font-bold transition-all z-50 ${notification.type === 'error' ? 'bg-red-500' : 'bg-green-500'}`}>
