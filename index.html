@@ -174,12 +174,12 @@
             const toggleAdmin = () => {
                 if (isAdmin) {
                     setIsAdmin(false);
-                    showNotification("已登出管理者模式");
+                    showNotification("已登出管理員模式");
                 } else {
-                    const pwd = prompt("請輸入管理者密碼：");
+                    const pwd = prompt("請輸入管理員密碼：");
                     if (pwd === ADMIN_PASSWORD) {
                         setIsAdmin(true);
-                        showNotification("已進入管理者模式");
+                        showNotification("已進入管理員模式");
                     } else if (pwd !== null) {
                         showNotification("密碼錯誤", "error");
                     }
@@ -198,12 +198,43 @@
                 return conflicts.length > 0 ? conflicts[0] : null;
             };
 
+            // === 修復：動態防呆邏輯 ===
+            const handleStartTimeChange = (newStartTime, isEdit = false) => {
+                const target = isEdit ? editingBooking : formData;
+                const setter = isEdit ? setEditingBooking : setFormData;
+                
+                let newEndTime = target.endTime;
+                if (newStartTime >= target.endTime) {
+                    const idx = TIME_OPTIONS.indexOf(newStartTime);
+                    newEndTime = TIME_OPTIONS[idx + 1] || newStartTime;
+                }
+                setter({ ...target, startTime: newStartTime, endTime: newEndTime });
+            };
+
+            const handleEndTimeChange = (newEndTime, isEdit = false) => {
+                const target = isEdit ? editingBooking : formData;
+                const setter = isEdit ? setEditingBooking : setFormData;
+
+                if (newEndTime <= target.startTime) {
+                    showNotification("結束時間必須晚於開始時間", "error");
+                    // 強制設定為開始時間的下一個時段
+                    const idx = TIME_OPTIONS.indexOf(target.startTime);
+                    newEndTime = TIME_OPTIONS[idx + 1] || target.startTime;
+                }
+                setter({ ...target, endTime: newEndTime });
+            };
+
             const handleSubmit = async (e) => {
                 e.preventDefault();
                 const trimmedTitle = formData.title.trim();
                 const trimmedUser = formData.user.trim();
                 if (!trimmedTitle || !trimmedUser) return showNotification("請填寫主題與預約者", "error");
-                if (formData.startTime >= formData.endTime) return showNotification("結束時間必須大於開始時間", "error");
+                
+                // 再次驗證
+                if (formData.startTime >= formData.endTime) {
+                    return showNotification("結束時間必須大於開始時間", "error");
+                }
+
                 const conflict = checkConflict(formData);
                 if (conflict) return showNotification(`時段衝突：[${conflict.startTime}-${conflict.endTime}] ${conflict.title}`, "error");
 
@@ -230,7 +261,10 @@
                 const trimmedTitle = editingBooking.title.trim();
                 const trimmedUser = editingBooking.user.trim();
                 if (!trimmedTitle || !trimmedUser) return showNotification("欄位不可為空", "error");
-                if (editingBooking.startTime >= editingBooking.endTime) return showNotification("結束時間必須大於開始時間", "error");
+                
+                if (editingBooking.startTime >= editingBooking.endTime) {
+                    return showNotification("結束時間必須大於開始時間", "error");
+                }
                 
                 const conflict = checkConflict(editingBooking, editingBooking.id);
                 if (conflict) return showNotification(`修改衝突：[${conflict.startTime}-${conflict.endTime}] ${conflict.title}`, "error");
@@ -331,7 +365,7 @@
                                         </div>
                                         <button onClick={toggleAdmin} className={`text-xs font-medium ${isAdmin ? 'text-green-600' : 'text-gray-400'}`}>
                                             <Icon name={isAdmin ? "unlock" : "lock"} size={12} className="inline mr-1" />
-                                            {isAdmin ? "管理者模式" : "管理者登入"}
+                                            {isAdmin ? "管理員模式" : "管理員登入"}
                                         </button>
                                     </div>
                                 </div>
@@ -369,13 +403,13 @@
                                         <div className="grid grid-cols-2 gap-4">
                                             <div>
                                                 <label className="block text-xs font-bold text-gray-400 mb-1 flex items-center gap-1"><Icon name="clock" size={14} /> 開始</label>
-                                                <select value={formData.startTime} onChange={e => setFormData({...formData, startTime: e.target.value})} className="w-full rounded border-gray-200 border p-2 bg-gray-50 text-sm outline-none focus:border-blue-500">
+                                                <select value={formData.startTime} onChange={e => handleStartTimeChange(e.target.value)} className="w-full rounded border-gray-200 border p-2 bg-gray-50 text-sm outline-none focus:border-blue-500">
                                                     {TIME_OPTIONS.map(time => <option key={time} value={time}>{time}</option>)}
                                                 </select>
                                             </div>
                                             <div>
                                                 <label className="block text-xs font-bold text-gray-400 mb-1 flex items-center gap-1"><Icon name="clock" size={14} /> 結束</label>
-                                                <select value={formData.endTime} onChange={e => setFormData({...formData, endTime: e.target.value})} className="w-full rounded border-gray-200 border p-2 bg-gray-50 text-sm outline-none focus:border-blue-500">
+                                                <select value={formData.endTime} onChange={e => handleEndTimeChange(e.target.value)} className="w-full rounded border-gray-200 border p-2 bg-gray-50 text-sm outline-none focus:border-blue-500">
                                                     {TIME_OPTIONS.map(time => <option key={time} value={time}>{time}</option>)}
                                                 </select>
                                             </div>
@@ -438,7 +472,6 @@
                                             </div>
                                         ) : renderMonthCalendar()}
 
-                                        {/* 新增的紅色提示字樣 */}
                                         <div className="mt-6 pt-4 border-t border-gray-100">
                                             <p className="text-[11px] text-red-500 font-medium">※ 如需修改或刪除預約資料，請聯絡管理者</p>
                                         </div>
@@ -454,7 +487,7 @@
                         </footer>
                     </div>
 
-                    {/* 管理者編輯彈窗 */}
+                    {/* 管理員編輯彈窗 */}
                     {editingBooking && (
                         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
                             <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200">
@@ -476,13 +509,13 @@
                                     <div className="grid grid-cols-2 gap-4">
                                         <div>
                                             <label className="block text-xs font-bold text-gray-400 mb-1">開始時間</label>
-                                            <select value={editingBooking.startTime} onChange={e => setEditingBooking({...editingBooking, startTime: e.target.value})} className="w-full border rounded p-2 text-sm bg-gray-50 focus:border-blue-500 outline-none">
+                                            <select value={editingBooking.startTime} onChange={e => handleStartTimeChange(e.target.value, true)} className="w-full border rounded p-2 text-sm bg-gray-50 focus:border-blue-500 outline-none">
                                                 {TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
                                             </select>
                                         </div>
                                         <div>
                                             <label className="block text-xs font-bold text-gray-400 mb-1">結束時間</label>
-                                            <select value={editingBooking.endTime} onChange={e => setEditingBooking({...editingBooking, endTime: e.target.value})} className="w-full border rounded p-2 text-sm bg-gray-50 focus:border-blue-500 outline-none">
+                                            <select value={editingBooking.endTime} onChange={e => handleEndTimeChange(e.target.value, true)} className="w-full border rounded p-2 text-sm bg-gray-50 focus:border-blue-500 outline-none">
                                                 {TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
                                             </select>
                                         </div>
