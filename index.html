@@ -13,6 +13,8 @@
         body { font-family: 'Noto Sans TC', sans-serif; }
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        .fade-enter { opacity: 0; transform: translateY(-10px); }
+        .fade-enter-active { opacity: 1; transform: translateY(0); transition: all 0.3s; }
     </style>
 </head>
 <body class="bg-gray-50">
@@ -21,54 +23,18 @@
     <script type="text/babel">
         const { useState, useMemo, useEffect, useCallback } = React;
 
-        // === 設定區 ===
+        // --- System Settings ---
+        const CURRENT_VERSION = "V1.3";
         const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyt7Lfy8xj-9-0kI0y2P-mDfhC7pa74KeQ4cmyw9Hy48IdV495eaGNwvlwP7xEUFXyUwA/exec"; 
         const ADMIN_PASSWORD = "admin0408"; 
 
-        const generateTimeOptions = () => {
-            const options = [];
-            for (let hour = 8; hour <= 20; hour++) {
-                const hh = String(hour).padStart(2, '0');
-                options.push(`${hh}:00`);
-                options.push(`${hh}:30`);
+        const VERSION_LOGS = [
+            { 
+                version: "V1.3", 
+                date: "2024-04-10", 
+                features: ["新增週期性預約功能(每天/每週/每月)", "新增「日/月」切換導覽按鈕"] 
             }
-            return options;
-        };
-        const TIME_OPTIONS = generateTimeOptions();
-
-        const formatDate = (input) => {
-            if (!input) return "";
-            try {
-                const date = new Date(input);
-                if (isNaN(date.getTime())) return String(input).split('T')[0];
-                const year = date.getFullYear();
-                const month = String(date.getMonth() + 1).padStart(2, '0');
-                const day = String(date.getDate()).padStart(2, '0');
-                return `${year}-${month}-${day}`;
-            } catch (e) {
-                return String(input).split('T')[0];
-            }
-        };
-
-        const formatTime = (input) => {
-            if (!input) return "00:00";
-            const str = String(input);
-            try {
-                if (str.includes('T')) {
-                    const date = new Date(input);
-                    const h = date.getHours();
-                    const m = date.getMinutes();
-                    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
-                }
-                if (str.includes(':')) {
-                    const parts = str.split(':');
-                    const h = parts[0].trim().padStart(2, '0');
-                    const m = parts[1].trim().slice(0, 2).padStart(2, '0');
-                    return `${h}:${m}`;
-                }
-            } catch (e) { console.error(e); }
-            return str;
-        };
+        ];
 
         const ROOMS = [
             { id: 'room-a', name: '會議室 901 (中型 10-15人)', color: 'bg-red-100 border-red-300 text-red-800' },
@@ -79,31 +45,47 @@
             { id: 'room-f', name: '會議室 704 (小型 6-8人)暫無設備', color: 'bg-purple-100 border-purple-300 text-purple-800' }
         ];
 
+        const generateTimeOptions = () => {
+            const options = [];
+            for (let hour = 8; hour <= 20; hour++) {
+                const hh = String(hour).padStart(2, '0');
+                options.push(`${hh}:00`, `${hh}:30`);
+            }
+            return options;
+        };
+        const TIME_OPTIONS = generateTimeOptions();
+
+        const formatDate = (date) => {
+            const d = new Date(date);
+            return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        };
+
+        const formatTime = (input) => {
+            if (!input) return "00:00";
+            const str = String(input);
+            if (str.includes('T')) {
+                const date = new Date(input);
+                return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+            }
+            return str;
+        };
+
         const Icon = ({ name, size = 18, className = "", isCustom = false }) => {
             if (isCustom) {
-                return (
-                    <img 
-                        src="https://lh3.google.com/u/0/d/1qc-oaNh8kQVx2FrBkUtnd0NTda6ScIDT=w1920-h953-iv2?auditContext=prefetch" 
-                        alt="logo" 
-                        style={{ width: '4em', height: '4em' }}
-                        className={`object-contain inline-block align-bottom ${className}`}
-                        onError={(e) => { e.target.src = 'https://via.placeholder.com/40?text=IMG'; }}
-                    />
-                );
+                return <img src="https://lh3.google.com/u/0/d/1qc-oaNh8kQVx2FrBkUtnd0NTda6ScIDT=w1920-h953-iv2" alt="logo" style={{ width: '4em', height: '4em' }} className={`object-contain inline-block align-bottom ${className}`} />;
             }
             const icons = {
-                calendar: <React.Fragment><rect x="3" y="4" width="18" height="18" rx="2" ry="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></React.Fragment>,
+                calendar: <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />,
                 cloud: <path d="M17.5 19c3.037 0 5.5-2.463 5.5-5.5 0-2.97-2.354-5.402-5.304-5.494A7 7 0 1 0 5 13.045c0 .015 0 .03.001.045C2.181 13.528 0 15.937 0 18.889c0 3.037 2.463 5.5 5.5 5.5h12z" />,
-                "map-pin": <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0zM12 10a3 3 0 1 0 0-6 3 3 0 0 0 0 6z" />,
-                clock: <React.Fragment><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></React.Fragment>,
-                user: <React.Fragment><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></React.Fragment>,
                 "chevron-left": <polyline points="15 18 9 12 15 6" />,
                 "chevron-right": <polyline points="9 18 15 12 9 6" />,
                 x: <React.Fragment><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></React.Fragment>,
                 "loader-2": <path d="M21 12a9 9 0 1 1-6.219-8.56" />,
                 lock: <React.Fragment><rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></React.Fragment>,
                 unlock: <React.Fragment><rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 9.9-1" /></React.Fragment>,
-                edit: <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                edit: <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />,
+                info: <React.Fragment><circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" /></React.Fragment>,
+                refresh: <React.Fragment><polyline points="23 4 23 10 17 10" /><polyline points="1 20 1 14 7 14" /><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" /></React.Fragment>
             };
             return (
                 <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`${className} ${name === 'loader-2' ? 'animate-spin' : ''}`}>
@@ -128,12 +110,14 @@
                 startTime: '09:00',
                 endTime: '10:00',
                 title: '',
-                user: ''
+                user: '',
+                repeatType: 'none', // none, daily, weekly, monthly
+                repeatCount: 1
             });
 
             const showNotification = useCallback((message, type = 'success') => {
                 setNotification({ message, type });
-                setTimeout(() => setNotification(null), 3000);
+                setTimeout(() => setNotification(null), 4000);
             }, []);
 
             const fetchBookings = async () => {
@@ -142,21 +126,15 @@
                 try {
                     const response = await fetch(SCRIPT_URL);
                     const rawData = await response.json();
-                    const normalizedData = rawData.map(item => {
-                        const getVal = (possibleKeys) => {
-                            const foundKey = Object.keys(item).find(k => possibleKeys.includes(k.toLowerCase()));
-                            return foundKey ? item[foundKey] : null;
-                        };
-                        return {
-                            id: String(getVal(['id', '編號']) || `temp-${Math.random()}`),
-                            roomId: getVal(['roomid', 'room_id', '會議室']) || 'room-a',
-                            date: formatDate(getVal(['date', 'bookingdate', '日期'])),
-                            startTime: formatTime(getVal(['starttime', '開始時間'])),
-                            endTime: formatTime(getVal(['endtime', '結束時間'])),
-                            title: getVal(['title', '主題']) || '無標題',
-                            user: getVal(['user', '預約者']) || '未知'
-                        };
-                    });
+                    const normalizedData = rawData.map(item => ({
+                        id: String(item.id || item['編號'] || Math.random()),
+                        roomId: item.roomId || item['會議室'] || 'room-a',
+                        date: formatDate(item.date || item['日期']),
+                        startTime: formatTime(item.startTime || item['開始時間']),
+                        endTime: formatTime(item.endTime || item['結束時間']),
+                        title: item.title || item['主題'] || '無標題',
+                        user: item.user || item['預約者'] || '未知'
+                    }));
                     setBookings(normalizedData);
                 } catch (error) {
                     showNotification("資料同步失敗", "error");
@@ -171,38 +149,45 @@
                 return () => clearInterval(interval);
             }, []);
 
+            const navigateDate = (direction) => {
+                const d = new Date(selectedDate);
+                if (viewMode === 'daily') d.setDate(d.getDate() + direction);
+                else { d.setMonth(d.getMonth() + direction); d.setDate(1); }
+                setSelectedDate(formatDate(d));
+            };
+
+            const goToCurrent = () => setSelectedDate(formatDate(new Date()));
+
             const toggleAdmin = () => {
                 if (isAdmin) {
                     setIsAdmin(false);
-                    showNotification("已登出管理員模式");
+                    showNotification("已登出管理者模式");
                 } else {
-                    const pwd = prompt("請輸入管理員密碼：");
+                    const pwd = prompt("請輸入管理者密碼：");
                     if (pwd === ADMIN_PASSWORD) {
                         setIsAdmin(true);
-                        showNotification("已進入管理員模式");
+                        showNotification("已進入管理者模式");
                     } else if (pwd !== null) {
                         showNotification("密碼錯誤", "error");
                     }
                 }
             };
 
-            const checkConflict = (newBooking, excludeId = null) => {
-                const start = newBooking.startTime;
-                const end = newBooking.endTime;
+            const checkConflict = (targetBooking, excludeId = null) => {
+                const start = targetBooking.startTime;
+                const end = targetBooking.endTime;
                 const conflicts = bookings.filter(b => 
                     b.id !== excludeId &&
-                    b.date === newBooking.date && 
-                    b.roomId === newBooking.roomId &&
+                    b.date === targetBooking.date && 
+                    b.roomId === targetBooking.roomId &&
                     start < b.endTime && end > b.startTime
                 );
                 return conflicts.length > 0 ? conflicts[0] : null;
             };
 
-            // === 修復：動態防呆邏輯 ===
             const handleStartTimeChange = (newStartTime, isEdit = false) => {
                 const target = isEdit ? editingBooking : formData;
                 const setter = isEdit ? setEditingBooking : setFormData;
-                
                 let newEndTime = target.endTime;
                 if (newStartTime >= target.endTime) {
                     const idx = TIME_OPTIONS.indexOf(newStartTime);
@@ -214,10 +199,8 @@
             const handleEndTimeChange = (newEndTime, isEdit = false) => {
                 const target = isEdit ? editingBooking : formData;
                 const setter = isEdit ? setEditingBooking : setFormData;
-
                 if (newEndTime <= target.startTime) {
                     showNotification("結束時間必須晚於開始時間", "error");
-                    // 強制設定為開始時間的下一個時段
                     const idx = TIME_OPTIONS.indexOf(target.startTime);
                     newEndTime = TIME_OPTIONS[idx + 1] || target.startTime;
                 }
@@ -226,33 +209,45 @@
 
             const handleSubmit = async (e) => {
                 e.preventDefault();
-                const trimmedTitle = formData.title.trim();
-                const trimmedUser = formData.user.trim();
+                const { title, user, repeatType, repeatCount, date, startTime, endTime } = formData;
+                const trimmedTitle = title.trim();
+                const trimmedUser = user.trim();
+
                 if (!trimmedTitle || !trimmedUser) return showNotification("請填寫主題與預約者", "error");
-                
-                // 再次驗證
-                if (formData.startTime >= formData.endTime) {
-                    return showNotification("結束時間必須大於開始時間", "error");
+                if (startTime >= endTime) return showNotification("結束時間必須大於開始時間", "error");
+
+                // 產生週期性預約的日期清單
+                const bookingDates = [];
+                let current = new Date(date);
+                for (let i = 0; i < (repeatType === 'none' ? 1 : repeatCount); i++) {
+                    bookingDates.push(formatDate(current));
+                    if (repeatType === 'daily') current.setDate(current.getDate() + 1);
+                    else if (repeatType === 'weekly') current.setDate(current.getDate() + 7);
+                    else if (repeatType === 'monthly') current.setMonth(current.getMonth() + 1);
                 }
 
-                const conflict = checkConflict(formData);
-                if (conflict) return showNotification(`時段衝突：[${conflict.startTime}-${conflict.endTime}] ${conflict.title}`, "error");
+                // 批次檢查每一天的衝突狀況
+                const newBookingsToSubmit = [];
+                for (const d of bookingDates) {
+                    const tempBooking = { ...formData, date: d, title: trimmedTitle, user: trimmedUser, id: `${Date.now()}-${Math.random()}` };
+                    const conflict = checkConflict(tempBooking);
+                    if (conflict) return showNotification(`日期 ${d} 時段衝突：[${conflict.startTime}-${conflict.endTime}] ${conflict.title}`, "error");
+                    newBookingsToSubmit.push(tempBooking);
+                }
 
                 setIsLoading(true);
                 try {
-                    const response = await fetch(SCRIPT_URL, {
-                        method: 'POST',
-                        body: JSON.stringify({ action: 'add', data: { ...formData, title: trimmedTitle, user: trimmedUser, id: Date.now().toString() } })
-                    });
-                    if (response.ok) {
-                        showNotification('預約成功！');
-                        fetchBookings();
-                        setFormData(prev => ({ ...prev, title: '', user: '' }));
+                    // 將無衝突的資料批次發送
+                    for (const b of newBookingsToSubmit) {
+                        await fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'add', data: b }) });
                     }
-                } catch (error) {
-                    showNotification('連線失敗', 'error');
-                } finally {
-                    setIsLoading(false);
+                    showNotification(`預約成功！共 ${newBookingsToSubmit.length} 筆`);
+                    fetchBookings();
+                    setFormData(prev => ({ ...prev, title: '', user: '', repeatType: 'none', repeatCount: 1 }));
+                } catch (error) { 
+                    showNotification('連線失敗', 'error'); 
+                } finally { 
+                    setIsLoading(false); 
                 }
             };
 
@@ -261,33 +256,19 @@
                 const trimmedTitle = editingBooking.title.trim();
                 const trimmedUser = editingBooking.user.trim();
                 if (!trimmedTitle || !trimmedUser) return showNotification("欄位不可為空", "error");
-                
-                if (editingBooking.startTime >= editingBooking.endTime) {
-                    return showNotification("結束時間必須大於開始時間", "error");
-                }
+                if (editingBooking.startTime >= editingBooking.endTime) return showNotification("結束時間必須大於開始時間", "error");
                 
                 const conflict = checkConflict(editingBooking, editingBooking.id);
                 if (conflict) return showNotification(`修改衝突：[${conflict.startTime}-${conflict.endTime}] ${conflict.title}`, "error");
 
                 setIsLoading(true);
                 try {
-                    await fetch(SCRIPT_URL, { 
-                        method: 'POST', 
-                        body: JSON.stringify({ action: 'delete', id: String(editingBooking.id) }) 
-                    });
-                    await fetch(SCRIPT_URL, { 
-                        method: 'POST', 
-                        body: JSON.stringify({ action: 'add', data: editingBooking }) 
-                    });
-                    
+                    await fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'delete', id: String(editingBooking.id) }) });
+                    await fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'add', data: editingBooking }) });
                     showNotification('資料已修改');
                     setEditingBooking(null);
                     fetchBookings();
-                } catch (error) {
-                    showNotification('更新失敗', 'error');
-                } finally {
-                    setIsLoading(false);
-                }
+                } catch (error) { showNotification('更新失敗', 'error'); } finally { setIsLoading(false); }
             };
 
             const handleDelete = async (id) => {
@@ -298,10 +279,7 @@
                     await fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'delete', id: String(id) }) });
                     fetchBookings();
                     showNotification('已刪除');
-                } catch (error) {
-                    showNotification('刪除失敗', 'error');
-                    setIsSyncing(false);
-                }
+                } catch (error) { showNotification('刪除失敗', 'error'); setIsSyncing(false); }
             };
 
             const todaysBookings = useMemo(() => {
@@ -314,152 +292,207 @@
                 const month = baseDate.getMonth();
                 const daysInMonth = new Date(year, month + 1, 0).getDate();
                 const firstDay = new Date(year, month, 1).getDay();
+                
                 const days = [];
-                for (let i = 0; i < firstDay; i++) days.push(<div key={`empty-${i}`} className="p-2 bg-gray-50/50"></div>);
+                for (let i = 0; i < firstDay; i++) {
+                    days.push({ day: null, dateStr: null });
+                }
                 for (let d = 1; d <= daysInMonth; d++) {
                     const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-                    const dayBookings = bookings.filter(b => b.date === dateStr).sort((a, b) => a.startTime.localeCompare(b.startTime));
-                    days.push(
-                        <div key={dateStr} onClick={() => { setSelectedDate(dateStr); setViewMode('daily'); }} className={`min-h-[110px] p-1 border border-gray-100 cursor-pointer hover:bg-blue-50 flex flex-col ${dateStr === selectedDate ? 'bg-blue-50 ring-1 ring-blue-500 inset' : 'bg-white'}`}>
-                            <div className={`text-xs font-bold text-center w-full pb-1 mb-1 border-b ${dateStr === formatDate(new Date()) ? 'text-blue-600' : 'text-gray-500'}`}>
-                                {d}
-                            </div>
-                            <div className="flex-1 overflow-y-auto space-y-1 no-scrollbar w-full">
-                                {dayBookings.map(b => {
-                                    const room = ROOMS.find(r => r.id === b.roomId);
-                                    const shortName = room ? room.name.replace(/會議室\s*/, '').split(' ')[0] : '';
-                                    return (
-                                        <div key={b.id} className={`text-[10px] leading-tight px-1 py-0.5 rounded truncate border ${room ? room.color : 'bg-gray-100'}`}>
-                                            <span className="font-bold">{shortName}</span> {b.startTime}
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        </div>
-                    );
+                    days.push({ day: d, dateStr });
                 }
+
                 return (
-                    <div className="grid grid-cols-7 gap-px bg-gray-200 border rounded-lg overflow-hidden">
-                        {['日', '一', '二', '三', '四', '五', '六'].map(day => <div key={day} className="bg-gray-100 py-1 text-center text-[10px] font-bold text-gray-400">{day}</div>)}
-                        {days}
+                    <div className="grid grid-cols-7 gap-px bg-gray-200 border rounded-lg overflow-hidden text-[10px]">
+                        {['日','一','二','三','四','五','六'].map(d => <div key={d} className="bg-gray-50 py-2 text-center font-bold text-gray-400 text-xs">{d}</div>)}
+                        {days.map((item, i) => {
+                            const isToday = item.dateStr === formatDate(new Date());
+                            const isSelected = item.dateStr === selectedDate;
+                            const dayBookings = item.dateStr ? bookings.filter(b => b.date === item.dateStr).sort((a,b) => a.startTime.localeCompare(b.startTime)) : [];
+                            
+                            return (
+                                <div 
+                                    key={i} 
+                                    onClick={() => {
+                                        if (item.dateStr) {
+                                            setSelectedDate(item.dateStr);
+                                            setViewMode('daily');
+                                        }
+                                    }}
+                                    className={`bg-white min-h-[90px] md:min-h-[110px] p-1 border-t border-r border-gray-100 relative transition-colors cursor-pointer hover:bg-blue-50/50 flex flex-col ${!item.day ? 'bg-gray-50/30' : ''}`}
+                                >
+                                    {item.day && (
+                                        <>
+                                            <span className={`text-[10px] md:text-xs font-bold w-5 h-5 md:w-6 md:h-6 flex items-center justify-center rounded-full shrink-0 ${isToday ? 'bg-blue-600 text-white' : 'text-gray-500'} ${isSelected ? 'ring-1 ring-blue-600' : ''}`}>
+                                                {item.day}
+                                            </span>
+                                            <div className="flex-1 w-full overflow-y-auto no-scrollbar space-y-1 mt-1 px-0.5">
+                                                {dayBookings.map(b => {
+                                                    const room = ROOMS.find(r => r.id === b.roomId);
+                                                    const shortName = room ? room.name.replace(/會議室\s*/, '').split(' ')[0] : '';
+                                                    return (
+                                                        <div 
+                                                            key={b.id} 
+                                                            className={`text-[9px] md:text-[10px] leading-tight px-1 py-0.5 rounded truncate border ${room ? room.color : 'bg-gray-100'}`} 
+                                                            title={`會議室：${room?.name}\n時段：${b.startTime}-${b.endTime}\n主題：${b.title}\n預約者：${b.user}`}
+                                                        >
+                                                            <span className="font-bold">{shortName}</span> {b.startTime}-{b.endTime}
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        </>
+                                    )}
+                                </div>
+                            );
+                        })}
                     </div>
                 );
             };
 
+            const currentDisplayHeader = useMemo(() => {
+                const d = new Date(selectedDate);
+                return viewMode === 'daily' ? selectedDate : `${d.getFullYear()}年 ${d.getMonth() + 1}月`;
+            }, [selectedDate, viewMode]);
+
             return (
                 <div className="min-h-screen p-4 md:p-8 flex flex-col">
                     <div className="max-w-6xl mx-auto w-full flex-grow">
-                        
-                        <header className="mb-6">
-                            <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
-                                <div className="flex flex-col items-start">
-                                    <div className="flex items-center gap-3">
-                                        <Icon name="calendar" isCustom={true} className="flex-shrink-0" />
-                                        <h1 className="text-xl md:text-3xl font-bold text-gray-900 leading-none">大林聯合建築師事務所</h1>
-                                    </div>
-                                    <h2 className="text-gray-600 text-lg md:text-2xl font-bold mt-0.5">會議室預約管理系統 V1.2</h2>
-                                    <div className="flex items-center gap-4 mt-3">
-                                        <div className="flex items-center gap-2 text-gray-400 text-xs">
-                                            <Icon name="cloud" size={14} />
-                                            <span>{isSyncing ? "同步中..." : "雲端已連線"}</span>
-                                        </div>
-                                        <button onClick={toggleAdmin} className={`text-xs font-medium ${isAdmin ? 'text-green-600' : 'text-gray-400'}`}>
-                                            <Icon name={isAdmin ? "unlock" : "lock"} size={12} className="inline mr-1" />
-                                            {isAdmin ? "管理員模式" : "管理員登入"}
-                                        </button>
-                                    </div>
+                        <header className="mb-6 flex flex-col md:flex-row justify-between items-start gap-4">
+                            <div>
+                                <div className="flex items-center gap-3">
+                                    <Icon name="calendar" isCustom={true} />
+                                    <h1 className="text-xl md:text-3xl font-bold text-gray-900">大林聯合建築師事務所</h1>
                                 </div>
-                                <div className="flex items-center bg-white rounded-lg shadow-sm border p-1 self-center md:self-start">
-                                    <button onClick={() => {
-                                        const d = new Date(selectedDate);
-                                        d.setDate(d.getDate() - 1);
-                                        setSelectedDate(formatDate(d));
-                                    }} className="p-2 hover:bg-gray-100 rounded text-gray-400"><Icon name="chevron-left" /></button>
-                                    <div className="px-4 font-bold text-gray-700">{selectedDate}</div>
-                                    <button onClick={() => {
-                                        const d = new Date(selectedDate);
-                                        d.setDate(d.getDate() + 1);
-                                        setSelectedDate(formatDate(d));
-                                    }} className="p-2 hover:bg-gray-100 rounded text-gray-400"><Icon name="chevron-right" /></button>
+                                <h2 className="text-gray-600 text-lg md:text-2xl font-bold mt-0.5">會議室預約管理系統 {CURRENT_VERSION}</h2>
+                                <div className="flex items-center gap-4 mt-2">
+                                    <div className="flex items-center gap-2 text-gray-400 text-xs">
+                                        <Icon name="cloud" size={14} />
+                                        <span>{isSyncing ? "同步中..." : "雲端已連線"}</span>
+                                    </div>
+                                    <button onClick={toggleAdmin} className="text-xs text-gray-400 hover:text-blue-500 transition-colors">
+                                        <Icon name={isAdmin ? "unlock" : "lock"} size={12} className="inline mr-1" />
+                                        {isAdmin ? "管理模式" : "管理者登入"}
+                                    </button>
                                 </div>
                             </div>
                         </header>
 
                         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                            {/* Left: Form */}
                             <div className="lg:col-span-1">
                                 <div className="bg-white rounded-xl shadow-sm border p-6 sticky top-6">
                                     <h3 className="text-sm font-bold text-gray-800 mb-4 border-b pb-2">預約登記表</h3>
                                     <form onSubmit={handleSubmit} className="space-y-4">
                                         <div>
-                                            <label className="block text-xs font-bold text-gray-400 mb-1 uppercase tracking-wider flex items-center gap-1"><Icon name="map-pin" size={14} /> 會議室</label>
-                                            <select value={formData.roomId} onChange={e => setFormData({...formData, roomId: e.target.value})} className="w-full rounded border-gray-200 border p-2 bg-gray-50 text-sm outline-none focus:border-blue-500">
+                                            <label className="block text-xs font-bold text-gray-400 mb-1">會議室</label>
+                                            <select value={formData.roomId} onChange={e => setFormData({...formData, roomId: e.target.value})} className="w-full rounded border p-2 bg-gray-50 text-sm outline-none focus:border-blue-500 transition-colors">
                                                 {ROOMS.map(room => <option key={room.id} value={room.id}>{room.name}</option>)}
                                             </select>
                                         </div>
                                         <div>
-                                            <label className="block text-xs font-bold text-gray-400 mb-1 uppercase tracking-wider flex items-center gap-1"><Icon name="calendar" size={14} /> 日期</label>
-                                            <input type="date" value={formData.date} onChange={e => {setFormData({...formData, date: e.target.value}); setSelectedDate(e.target.value);}} className="w-full rounded border-gray-200 border p-2 bg-gray-50 text-sm outline-none focus:border-blue-500" />
+                                            <label className="block text-xs font-bold text-gray-400 mb-1">日期</label>
+                                            <input type="date" value={formData.date} onChange={e => {setFormData({...formData, date: e.target.value}); setSelectedDate(e.target.value);}} className="w-full rounded border p-2 bg-gray-50 text-sm outline-none focus:border-blue-500 transition-colors" />
                                         </div>
                                         <div className="grid grid-cols-2 gap-4">
                                             <div>
-                                                <label className="block text-xs font-bold text-gray-400 mb-1 flex items-center gap-1"><Icon name="clock" size={14} /> 開始</label>
-                                                <select value={formData.startTime} onChange={e => handleStartTimeChange(e.target.value)} className="w-full rounded border-gray-200 border p-2 bg-gray-50 text-sm outline-none focus:border-blue-500">
+                                                <label className="block text-xs font-bold text-gray-400 mb-1">開始時間</label>
+                                                <select value={formData.startTime} onChange={e => handleStartTimeChange(e.target.value)} className="w-full rounded border p-2 bg-gray-50 text-sm outline-none focus:border-blue-500 transition-colors">
                                                     {TIME_OPTIONS.map(time => <option key={time} value={time}>{time}</option>)}
                                                 </select>
                                             </div>
                                             <div>
-                                                <label className="block text-xs font-bold text-gray-400 mb-1 flex items-center gap-1"><Icon name="clock" size={14} /> 結束</label>
-                                                <select value={formData.endTime} onChange={e => handleEndTimeChange(e.target.value)} className="w-full rounded border-gray-200 border p-2 bg-gray-50 text-sm outline-none focus:border-blue-500">
+                                                <label className="block text-xs font-bold text-gray-400 mb-1">結束時間</label>
+                                                <select value={formData.endTime} onChange={e => handleEndTimeChange(e.target.value)} className="w-full rounded border p-2 bg-gray-50 text-sm outline-none focus:border-blue-500 transition-colors">
                                                     {TIME_OPTIONS.map(time => <option key={time} value={time}>{time}</option>)}
                                                 </select>
                                             </div>
                                         </div>
+                                        
+                                        {/* 週期性預約功能區塊 */}
+                                        <div className="p-3 bg-blue-50/50 rounded-lg border border-blue-100 space-y-3 transition-colors">
+                                            <div>
+                                                <label className="block text-xs font-bold text-blue-400 mb-1 flex items-center gap-1"><Icon name="refresh" size={12} /> 重複週期</label>
+                                                <select value={formData.repeatType} onChange={e => setFormData({...formData, repeatType: e.target.value})} className="w-full rounded border-blue-200 border p-2 bg-white text-sm outline-none focus:border-blue-500 transition-colors">
+                                                    <option value="none">不重複</option>
+                                                    <option value="daily">每天</option>
+                                                    <option value="weekly">每週</option>
+                                                    <option value="monthly">每月</option>
+                                                </select>
+                                            </div>
+                                            {formData.repeatType !== 'none' && (
+                                                <div className="animate-in fade-in slide-in-from-top-2">
+                                                    <label className="block text-xs font-bold text-blue-400 mb-1 flex justify-between">
+                                                        <span>重複次數</span>
+                                                        <span className="text-blue-600">{formData.repeatCount} 次</span>
+                                                    </label>
+                                                    <input type="range" min="1" max="12" value={formData.repeatCount} onChange={e => setFormData({...formData, repeatCount: parseInt(e.target.value)})} className="w-full h-2 bg-blue-200 rounded-lg appearance-none cursor-pointer accent-blue-600" />
+                                                    <p className="text-[10px] text-blue-400 mt-1 italic">※ 最多支援連續 12 次預約</p>
+                                                </div>
+                                            )}
+                                        </div>
+
                                         <div>
-                                            <label className="block text-xs font-bold text-gray-400 mb-1 flex items-center gap-1"><Icon name="edit" size={14} /> 會議主題</label>
-                                            <input type="text" value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} className="w-full rounded border-gray-200 border p-2 bg-gray-50 text-sm outline-none focus:border-blue-500" placeholder="請輸入會議主題" />
+                                            <label className="block text-xs font-bold text-gray-400 mb-1">會議主題</label>
+                                            <input type="text" value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} className="w-full rounded border p-2 bg-gray-50 text-sm outline-none focus:border-blue-500 transition-colors" placeholder="主題" />
                                         </div>
                                         <div>
-                                            <label className="block text-xs font-bold text-gray-400 mb-1 flex items-center gap-1"><Icon name="user" size={14} /> 預約者</label>
-                                            <input type="text" value={formData.user} onChange={e => setFormData({...formData, user: e.target.value})} className="w-full rounded border-gray-200 border p-2 bg-gray-50 text-sm outline-none focus:border-blue-500" placeholder="您的姓名+分機" />
+                                            <label className="block text-xs font-bold text-gray-400 mb-1">預約者</label>
+                                            <input type="text" value={formData.user} onChange={e => setFormData({...formData, user: e.target.value})} className="w-full rounded border p-2 bg-gray-50 text-sm outline-none focus:border-blue-500 transition-colors" placeholder="姓名+分機" />
                                         </div>
-                                        <button type="submit" disabled={isLoading} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded transition flex items-center justify-center gap-2">
-                                            {isLoading ? <Icon name="loader-2" size={18} /> : '登記'}
+                                        <button type="submit" disabled={isLoading} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded shadow-lg transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2">
+                                            {isLoading ? <Icon name="loader-2" size={18} /> : (formData.repeatType === 'none' ? '登記預約' : `批次登記 ${formData.repeatCount} 筆`)}
                                         </button>
                                     </form>
                                 </div>
                             </div>
 
+                            {/* Right: List/Calendar */}
                             <div className="lg:col-span-2 space-y-6">
                                 <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
-                                    <div className="bg-gray-50 border-b p-4 flex justify-between items-center">
-                                        <h2 className="font-bold text-gray-700">預約詳情 ({selectedDate})</h2>
-                                        <div className="flex bg-gray-200 p-1 rounded">
-                                            <button onClick={() => setViewMode('daily')} className={`px-3 py-1 text-xs font-bold rounded ${viewMode === 'daily' ? 'bg-white text-blue-600' : 'text-gray-500'}`}>日視圖</button>
-                                            <button onClick={() => setViewMode('monthly')} className={`px-3 py-1 text-xs font-bold rounded ${viewMode === 'monthly' ? 'bg-white text-blue-600' : 'text-gray-500'}`}>月視圖</button>
+                                    <div className="bg-gray-50 border-b px-4 py-3 flex flex-col md:flex-row justify-between items-center gap-4">
+                                        <div className="flex items-center gap-2">
+                                            <h2 className="font-bold text-gray-700">預約詳情</h2>
+                                            <span className="px-3 py-1 bg-blue-50 text-blue-700 font-black text-xs rounded-full border border-blue-100">{currentDisplayHeader}</span>
+                                        </div>
+                                        
+                                        <div className="flex items-center gap-3">
+                                            <div className="flex items-center bg-gray-200 p-1 rounded-lg gap-1">
+                                                <div className="flex bg-white/50 rounded p-0.5 mr-1">
+                                                    <button onClick={() => navigateDate(-1)} className="p-1 hover:bg-white rounded text-gray-500 transition-colors"><Icon name="chevron-left" size={14} /></button>
+                                                    <button onClick={goToCurrent} className="px-2 py-0.5 text-[10px] font-bold text-gray-600 hover:bg-white rounded transition-colors whitespace-nowrap">
+                                                        {viewMode === 'daily' ? '本日' : '本月'}
+                                                    </button>
+                                                    <button onClick={() => navigateDate(1)} className="p-1 hover:bg-white rounded text-gray-500 transition-colors"><Icon name="chevron-right" size={14} /></button>
+                                                </div>
+                                                <div className="flex gap-1">
+                                                    <button onClick={() => setViewMode('daily')} className={`px-4 py-1.5 text-xs font-bold rounded-md transition-all ${viewMode === 'daily' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-600'}`}>日視圖</button>
+                                                    <button onClick={() => setViewMode('monthly')} className={`px-4 py-1.5 text-xs font-bold rounded-md transition-all ${viewMode === 'monthly' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-600'}`}>月視圖</button>
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
-                                    <div className="p-6">
+
+                                    <div className="p-4 md:p-6 min-h-[400px]">
                                         {viewMode === 'daily' ? (
                                             <div className="space-y-6">
                                                 {ROOMS.map(room => {
                                                     const roomBookings = todaysBookings.filter(b => b.roomId === room.id);
                                                     return (
-                                                        <div key={room.id}>
-                                                            <h3 className={`text-xs font-bold mb-2 px-2 py-0.5 rounded border inline-block ${room.color}`}>{room.name}</h3>
-                                                            {roomBookings.length === 0 ? (
-                                                                <p className="text-xs text-gray-300 italic ml-2">暫無預約</p>
-                                                            ) : (
+                                                        <div key={room.id} className="border-b border-gray-50 pb-4 last:border-0">
+                                                            <h3 className={`text-[10px] font-bold mb-2 px-2 py-0.5 rounded border inline-block ${room.color}`}>{room.name}</h3>
+                                                            {roomBookings.length === 0 ? <p className="text-xs text-gray-300 italic ml-2">暫無預約</p> : (
                                                                 <div className="grid gap-2 mt-2">
                                                                     {roomBookings.map(b => (
-                                                                        <div key={b.id} className="flex items-center justify-between p-3 bg-gray-50 rounded border border-gray-100 group">
+                                                                        <div key={b.id} className="flex items-center justify-between p-3 bg-white hover:bg-gray-50 rounded-lg border border-gray-100 group transition-all">
                                                                             <div className="flex items-center gap-3">
-                                                                                <span className="text-xs font-mono font-bold text-blue-600 bg-white px-2 py-1 rounded border">{b.startTime}-{b.endTime}</span>
-                                                                                <span className="text-sm font-bold text-gray-700">{b.title} <span className="text-gray-400 font-normal ml-2">({b.user})</span></span>
+                                                                                <span className="text-xs font-mono font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded border border-blue-100">{b.startTime}-{b.endTime}</span>
+                                                                                <span className="text-sm font-bold text-gray-700 truncate max-w-[150px] md:max-w-none">{b.title} <span className="text-gray-400 font-normal ml-2 text-xs">By: {b.user}</span></span>
                                                                             </div>
                                                                             {isAdmin && (
-                                                                                <div className="flex items-center gap-2">
-                                                                                    <button onClick={() => setEditingBooking(b)} className="text-gray-300 hover:text-blue-500 p-1 transition"><Icon name="edit" size={14} /></button>
-                                                                                    <button onClick={() => handleDelete(b.id)} className="text-gray-300 hover:text-red-500 p-1 transition"><Icon name="x" size={14} /></button>
+                                                                                <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                                                    <button onClick={() => setEditingBooking(b)} className="text-gray-400 hover:text-blue-500 p-1 bg-white rounded border border-gray-100 shadow-sm"><Icon name="edit" size={14} /></button>
+                                                                                    <button onClick={() => handleDelete(b.id)} className="text-gray-400 hover:text-red-500 p-1 bg-white rounded border border-gray-100 shadow-sm"><Icon name="x" size={14} /></button>
                                                                                 </div>
                                                                             )}
                                                                         </div>
@@ -473,8 +506,29 @@
                                         ) : renderMonthCalendar()}
 
                                         <div className="mt-6 pt-4 border-t border-gray-100">
-                                            <p className="text-[11px] text-red-500 font-medium">※ 如需修改或刪除預約資料，請聯絡管理者</p>
+                                            <p className="text-[11px] text-red-500 font-medium italic">※ 如需修改或刪除預約資料，請通知管理者協助！</p>
                                         </div>
+                                    </div>
+                                </div>
+
+                                {/* Log */}
+                                <div className="bg-white rounded-xl shadow-sm border p-6">
+                                    <div className="flex items-center gap-2 mb-4 text-gray-800 border-b pb-2">
+                                        <Icon name="info" size={18} className="text-blue-500" />
+                                        <h3 className="text-sm font-bold">系統更新日誌</h3>
+                                    </div>
+                                    <div className="space-y-4 max-h-[150px] overflow-y-auto no-scrollbar">
+                                        {VERSION_LOGS.map((log, idx) => (
+                                            <div key={idx} className="relative pl-4 border-l-2 border-gray-100">
+                                                <div className="flex items-baseline gap-2 mb-1">
+                                                    <span className="text-xs font-black text-blue-600">{log.version}</span>
+                                                    <span className="text-[10px] text-gray-400">{log.date}</span>
+                                                </div>
+                                                <ul className="text-xs text-gray-500 space-y-1">
+                                                    {log.features.map((f, i) => <li key={i}>• {f}</li>)}
+                                                </ul>
+                                            </div>
+                                        ))}
                                     </div>
                                 </div>
                             </div>
@@ -487,50 +541,50 @@
                         </footer>
                     </div>
 
-                    {/* 管理員編輯彈窗 */}
+                    {/* 管理者編輯彈窗 */}
                     {editingBooking && (
                         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
                             <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200">
                                 <div className="bg-blue-600 p-4 text-white flex justify-between items-center font-bold">
-                                    <span>修改預約資料</span>
-                                    <button onClick={() => setEditingBooking(null)}><Icon name="x" /></button>
+                                    <span>修改預約資料 (ID: {editingBooking.id.slice(0,8)})</span>
+                                    <button onClick={() => setEditingBooking(null)} className="hover:rotate-90 transition-transform"><Icon name="x" /></button>
                                 </div>
                                 <div className="p-6 space-y-4">
                                     <div>
                                         <label className="block text-xs font-bold text-gray-400 mb-1">會議室</label>
-                                        <select value={editingBooking.roomId} onChange={e => setEditingBooking({...editingBooking, roomId: e.target.value})} className="w-full border rounded p-2 text-sm bg-gray-50 focus:border-blue-500 outline-none">
+                                        <select value={editingBooking.roomId} onChange={e => setEditingBooking({...editingBooking, roomId: e.target.value})} className="w-full border rounded p-2 text-sm bg-gray-50 focus:border-blue-500 outline-none transition-colors">
                                             {ROOMS.map(room => <option key={room.id} value={room.id}>{room.name}</option>)}
                                         </select>
                                     </div>
                                     <div>
                                         <label className="block text-xs font-bold text-gray-400 mb-1">會議日期</label>
-                                        <input type="date" value={editingBooking.date} onChange={e => setEditingBooking({...editingBooking, date: e.target.value})} className="w-full border rounded p-2 text-sm bg-gray-50 focus:border-blue-500 outline-none" />
+                                        <input type="date" value={editingBooking.date} onChange={e => setEditingBooking({...editingBooking, date: e.target.value})} className="w-full border rounded p-2 text-sm bg-gray-50 focus:border-blue-500 outline-none transition-colors" />
                                     </div>
                                     <div className="grid grid-cols-2 gap-4">
                                         <div>
                                             <label className="block text-xs font-bold text-gray-400 mb-1">開始時間</label>
-                                            <select value={editingBooking.startTime} onChange={e => handleStartTimeChange(e.target.value, true)} className="w-full border rounded p-2 text-sm bg-gray-50 focus:border-blue-500 outline-none">
+                                            <select value={editingBooking.startTime} onChange={e => handleStartTimeChange(e.target.value, true)} className="w-full border rounded p-2 text-sm bg-gray-50 focus:border-blue-500 outline-none transition-colors">
                                                 {TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
                                             </select>
                                         </div>
                                         <div>
                                             <label className="block text-xs font-bold text-gray-400 mb-1">結束時間</label>
-                                            <select value={editingBooking.endTime} onChange={e => handleEndTimeChange(e.target.value, true)} className="w-full border rounded p-2 text-sm bg-gray-50 focus:border-blue-500 outline-none">
+                                            <select value={editingBooking.endTime} onChange={e => handleEndTimeChange(e.target.value, true)} className="w-full border rounded p-2 text-sm bg-gray-50 focus:border-blue-500 outline-none transition-colors">
                                                 {TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
                                             </select>
                                         </div>
                                     </div>
                                     <div>
                                         <label className="block text-xs font-bold text-gray-400 mb-1">會議主題</label>
-                                        <input type="text" value={editingBooking.title} onChange={e => setEditingBooking({...editingBooking, title: e.target.value})} className="w-full border rounded p-2 text-sm bg-gray-50 focus:border-blue-500 outline-none" />
+                                        <input type="text" value={editingBooking.title} onChange={e => setEditingBooking({...editingBooking, title: e.target.value})} className="w-full border rounded p-2 text-sm bg-gray-50 focus:border-blue-500 outline-none transition-colors" />
                                     </div>
                                     <div>
                                         <label className="block text-xs font-bold text-gray-400 mb-1">預約者</label>
-                                        <input type="text" value={editingBooking.user} onChange={e => setEditingBooking({...editingBooking, user: e.target.value})} className="w-full border rounded p-2 text-sm bg-gray-50 focus:border-blue-500 outline-none" />
+                                        <input type="text" value={editingBooking.user} onChange={e => setEditingBooking({...editingBooking, user: e.target.value})} className="w-full border rounded p-2 text-sm bg-gray-50 focus:border-blue-500 outline-none transition-colors" />
                                     </div>
                                     <div className="flex gap-3 pt-4 border-t">
-                                        <button onClick={() => setEditingBooking(null)} className="flex-1 py-2 text-gray-500 font-bold hover:bg-gray-100 rounded">取消</button>
-                                        <button onClick={handleUpdate} disabled={isLoading} className="flex-1 py-2 bg-blue-600 text-white font-bold hover:bg-blue-700 rounded flex items-center justify-center gap-2">
+                                        <button onClick={() => setEditingBooking(null)} className="flex-1 py-2 text-gray-500 font-bold hover:bg-gray-100 rounded transition-colors">取消</button>
+                                        <button onClick={handleUpdate} disabled={isLoading} className="flex-1 py-2 bg-blue-600 text-white font-bold rounded shadow hover:bg-blue-700 transition-colors flex items-center justify-center gap-2">
                                             {isLoading ? <Icon name="loader-2" size={16} /> : '儲存修改'}
                                         </button>
                                     </div>
@@ -540,7 +594,7 @@
                     )}
 
                     {notification && (
-                        <div className={`fixed bottom-4 right-4 px-6 py-3 rounded-lg shadow-lg text-white font-bold transition-all z-[110] animate-in slide-in-from-bottom-5 ${notification.type === 'error' ? 'bg-red-500' : 'bg-green-500'}`}>
+                        <div className={`fixed bottom-4 right-4 px-6 py-3 rounded-lg shadow-lg text-white font-bold z-[110] animate-in slide-in-from-bottom-5 duration-300 ${notification.type === 'error' ? 'bg-red-500' : 'bg-green-600'}`}>
                             {notification.message}
                         </div>
                     )}
