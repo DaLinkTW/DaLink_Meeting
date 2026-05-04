@@ -39,12 +39,17 @@
         // ============================================================
         const CURRENT_VERSION = "V1.4";
         // Google Apps Script 部署網址 (後端 API)
-        const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzELIAQ6Y6_0FzcFjWjWl0F9dgDTg1EhRpHtBQKNf5CFGFliQleZZIpB-q4PobCvaJa/exec"; 
+        const SCRIPT_URL = "https://script.google.com/macros/s/AKfycby4jFqFwvwTnY8hJuurEJfkR5cSkwwldhWIJhopBuu4OLmDtwwPuvWh94OHi8zYQ1g/exec"; 
 		
         const ADMIN_PASSWORD = "admin0408"; 
 
         // 系統更新日誌內容
         const VERSION_LOGS = [
+			{ 
+                version: "V1.4.1", 
+                date: "2026-05-04", 
+                features: ["管理者名單異動"] 
+            },
             { 
                 version: "V1.4", 
                 date: "2026-04-21", 
@@ -821,13 +826,14 @@
                                     <div className="text-[10px] text-slate-500 font-bold grid grid-cols-1 gap-1">
                                         <span>張芸眉 (分機 502) / 李協華 (分機 501)</span>
                                         <span>鄭兆捷 (分機 243) / 廖詩華 (分機 241)</span>
+                                        <span>陳逸儒 (分機 211) / 劉玨妏 (分機 169)</span>
                                     </div>
                                 </div>
                                 <div className="space-y-1">
                                     <p className="text-[11px] text-emerald-400 font-black underline decoration-2 underline-offset-4">7F</p>
                                     <div className="text-[10px] text-slate-500 font-bold grid grid-cols-1 gap-1">
-                                        <span>陳惠琴 (分機 721) / 巫郁瑩 (分機 722)</span>
-                                        <span>吳書緯 (分機 731)</span>
+                                        <span>陳惠琴 (分機 721) / 吳書緯 (分機 731)</span>
+
                                     </div>
                                 </div>
                             </div>
